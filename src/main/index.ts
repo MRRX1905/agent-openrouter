@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Orchestrator } from './agent/orchestrator';
 import { openDatabase } from './db/database';
 import { emitAgentEvent } from './events';
+import { GitHubAuth } from './github/auth';
 import { registerIpc } from './ipc';
 import { ApprovalService } from './policy/approval-service';
 import { classifyCommand } from './policy/policy-engine';
@@ -77,6 +78,7 @@ app.whenReady().then(() => {
   const gateway = new OpenRouterClient({ apiKey: () => settings.getOpenRouterKey() });
   const quality = new QualityService(workspaces, terminal, approvals);
   const skills = new SkillService(db, join(app.getPath('userData'), 'skills'));
+  const github = new GitHubAuth({ clientId: () => settings.get().githubClientId, secrets });
   const orchestrator = new Orchestrator({
     db,
     projects,
@@ -87,7 +89,7 @@ app.whenReady().then(() => {
     model: () => settings.get().model,
     quality,
   });
-  registerIpc({ settings, budget, db, terminal, projects, approvals, orchestrator, skills });
+  registerIpc({ settings, budget, db, terminal, projects, approvals, orchestrator, skills, github });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

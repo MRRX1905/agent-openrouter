@@ -1,9 +1,10 @@
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, shell } from 'electron';
 import type { DatabaseSync } from 'node:sqlite';
 import { newId } from '../shared/ids';
 import type { AppSettings, OperatingMode, ProjectBrief } from '../shared/types';
 import type { Orchestrator } from './agent/orchestrator';
 import { getLatestJob, getProject } from './db/repositories';
+import type { GitHubAuth } from './github/auth';
 import type { ApprovalService } from './policy/approval-service';
 import type { BudgetService } from './providers/budget';
 import type { ProjectsService } from './projects-service';
@@ -21,6 +22,7 @@ export interface IpcDeps {
   approvals: ApprovalService;
   orchestrator: Orchestrator;
   skills: SkillService;
+  github: GitHubAuth;
 }
 
 const asObject = (value: unknown): Record<string, unknown> => {
@@ -137,6 +139,16 @@ export function registerIpc(deps: IpcDeps): void {
     const { skillId, enabled } = asObject(payload);
     if (typeof skillId !== 'string' || typeof enabled !== 'boolean') throw new Error('VALIDATION: invalid skill toggle');
     deps.skills.setEnabled(skillId, enabled);
+    return { ok: true } as const;
+  });
+  ipcMain.handle('github:startDeviceFlow', async () => {
+    const started = await deps.github.start();
+    await shell.openExternal(started.verificationUri);
+    return started;
+  });
+  ipcMain.handle('github:pollDeviceFlow', () => deps.github.poll());
+  ipcMain.handle('github:disconnect', () => {
+    deps.github.disconnect();
     return { ok: true } as const;
   });
 }

@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import StatusBadge from '../components/StatusBadge';
 import TerminalPanel from '../components/TerminalPanel';
 import ApprovalModal from '../components/ApprovalModal';
+import GitHubPanel from '../components/GitHubPanel';
 import ReviewPanel from '../components/ReviewPanel';
 
 export default function ProjectPage({ projectId }: { projectId: string }) {
@@ -50,6 +51,7 @@ export default function ProjectPage({ projectId }: { projectId: string }) {
         <button disabled={project.status !== 'PAUSED'} onClick={() => void resume()}>Resume</button>
       </div>
       <ApprovalModal projectId={project.id} />
+      <GitHubPanel />
       {(project.status === 'REVIEW_REQUIRED' || project.status === 'NEEDS_REPAIR') && (
         <ReviewPanel projectId={project.id} refreshKey={refreshKey} />
       )}

@@ -27,6 +27,7 @@ export interface IpcContract {
   'skills:setEnabled': { req: { skillId: string; enabled: boolean }; res: { ok: true } };
   'github:startDeviceFlow': { req: void; res: { userCode: string; verificationUri: string; expiresIn: number } };
   'github:pollDeviceFlow': { req: void; res: { status: 'pending' | 'connected' | 'expired'; login?: string } };
+  'github:disconnect': { req: void; res: { ok: true } };
   'github:publish': { req: { projectId: string; repoName: string; visibility: 'private' | 'public' }; res: { repoUrl: string; commitSha: string } };
   'budget:get': { req: { projectId?: string }; res: { used: number; cap: number; reservePct: number } };
   'backup:create': { req: void; res: { path: string } };
