@@ -91,6 +91,30 @@ describe('Orchestrator', () => {
     expect(projects.get(project.id).status).toBe('FAILED');
   });
 
+  it('moves to NEEDS_REPAIR when the quality gate fails', async () => {
+    const project = projects.list()[0]!;
+    const quality = {
+      run: async () => ({ dod: { passed: false, failures: ['check: test failed'] }, checks: { dod: { passed: false } } }),
+    };
+    const gated = new Orchestrator({
+      db, projects, gateway: { chat: async () => responses.shift()! },
+      tools: new ToolRouter(new WorkspaceService(workspace)),
+      budget: new BudgetService(db, { dailyRequestCap: 20, repairReservePct: 20 }),
+      events: () => {}, model: () => 'm', maxSteps: 8, quality,
+    });
+    const stages = ['READY', 'BUILDING', 'TESTING', 'DOCUMENTING', 'REVIEW_REQUIRED'];
+    for (const stage of stages) {
+      responses.push({
+        id: stage, model: 'm', provider: null, content: '',
+        toolCalls: [tool('update_stage', { stage, summary: stage })],
+        usage: null, finishReason: 'tool_calls',
+      });
+    }
+    const jobId = gated.start(project.id);
+    await gated.waitForIdle(jobId);
+    expect(projects.get(project.id).status).toBe('NEEDS_REPAIR');
+  });
+
   it('pauses when the budget is exhausted', async () => {
     const project = projects.list()[0]!;
     const tight = new Orchestrator({

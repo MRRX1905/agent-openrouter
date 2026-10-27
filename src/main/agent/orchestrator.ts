@@ -10,10 +10,11 @@ import { OpenRouterError, type ChatResponse } from '../providers/openrouter';
 import type { BudgetService } from '../providers/budget';
 import { assertTransition, isTerminal } from './state-machine';
 import { buildStagePrompt, buildSystemPrompt } from './prompts';
-import { saveCheckpoint } from './checkpoint';
+import { loadCheckpoint, saveCheckpoint } from './checkpoint';
 import { COMMAND_TOOLS, FILE_TOOLS, STAGE_TOOL } from '../tools/tool-defs';
 import type { ToolRouter } from '../tools/tool-router';
 import type { ProjectsService } from '../projects-service';
+import type { QualityGate } from '../quality/quality-service';
 
 export interface ModelGateway {
   chat(input: { model: string; messages: AgentMessage[]; tools: ToolDefinition[] }): Promise<ChatResponse>;
@@ -28,6 +29,7 @@ export interface OrchestratorDeps {
   events: (event: AgentEvent) => void;
   model: () => string;
   maxSteps?: number;
+  quality?: QualityGate;
 }
 
 const TOOLS: ToolDefinition[] = [...FILE_TOOLS, ...COMMAND_TOOLS, STAGE_TOOL];
@@ -136,7 +138,10 @@ export class Orchestrator {
           role: 'user',
           content: 'Lanjutkan dengan memanggil tool. Gunakan update_stage jika tahap selesai.',
         });
-        saveCheckpoint(this.deps.db, jobId, { stage: getJob(this.deps.db, jobId).currentStage, lastTool: null, summary: 'no tool call' });
+        saveCheckpoint(this.deps.db, jobId, {
+          stage: getJob(this.deps.db, jobId).currentStage, lastTool: null, summary: 'no tool call',
+          checks: loadCheckpoint(this.deps.db, jobId)?.checks,
+        });
         continue;
       }
 
@@ -156,10 +161,12 @@ export class Orchestrator {
       }
 
       const current = getJob(this.deps.db, jobId);
+      const previous = loadCheckpoint(this.deps.db, jobId);
       saveCheckpoint(this.deps.db, jobId, {
         stage: current.currentStage,
         lastTool: response.toolCalls.at(-1)?.function.name ?? null,
         summary: response.content ?? '',
+        checks: previous?.checks,
       });
       if (['REVIEW_REQUIRED', 'COMPLETED', 'FAILED', 'NEEDS_REPAIR', 'BLOCKED', 'PAUSED'].includes(current.currentStage)) return;
     }
@@ -167,30 +174,56 @@ export class Orchestrator {
   }
 
   private async handleStage(jobId: string, toolCallId: string, rawArgs: string): Promise<void> {
+    let args: { stage: ProjectStatus; summary?: string };
+    try {
+      args = JSON.parse(rawArgs) as { stage: ProjectStatus; summary?: string };
+      if (typeof args.stage !== 'string') throw new Error('stage is required');
+    } catch (error) {
+      appendMessage(this.deps.db, jobId, { role: 'tool', tool_call_id: toolCallId, content: `VALIDATION: ${redact(error instanceof Error ? error.message : String(error))}` });
+      return;
+    }
     const job = getJob(this.deps.db, jobId);
     const project = getProject(this.deps.db, job.projectId);
-    try {
-      const args = JSON.parse(rawArgs) as { stage?: ProjectStatus; summary?: string };
-      if (typeof args.stage !== 'string') throw new Error('VALIDATION: stage is required');
-      if (typeof args.summary !== 'string' || !args.summary.trim()) throw new Error('VALIDATION: summary is required');
-      assertTransition(job.currentStage, args.stage);
-      updateJob(this.deps.db, jobId, { currentStage: args.stage });
-      updateProjectStatus(this.deps.db, project.id, args.stage);
-      appendMessage(this.deps.db, jobId, { role: 'tool', tool_call_id: toolCallId, content: `stage=${args.stage}` });
-      appendAudit(this.deps.db, {
-        actor: 'agent', eventType: 'stage.change', target: project.id, result: 'ok',
-        metadata: { from: job.currentStage, to: args.stage, summary: args.summary },
+
+    if (args.stage === 'REVIEW_REQUIRED' && this.deps.quality) {
+      let report: { dod: { passed: boolean; failures: string[] }; checks?: unknown };
+      try {
+        report = await this.deps.quality.run(project);
+      } catch (error) {
+        appendMessage(this.deps.db, jobId, { role: 'tool', tool_call_id: toolCallId, content: `QUALITY: ${redact(error instanceof Error ? error.message : String(error))}` });
+        return;
+      }
+      saveCheckpoint(this.deps.db, jobId, {
+        stage: job.currentStage, lastTool: 'quality_gate', summary: 'quality gate result', checks: report,
       });
-      this.deps.events({ type: 'stage', projectId: project.id, jobId, stage: args.stage, summary: args.summary });
-    } catch (error) {
-      const message = redact(error instanceof Error ? error.message : String(error));
-      appendMessage(this.deps.db, jobId, { role: 'tool', tool_call_id: toolCallId, content: message });
-      appendAudit(this.deps.db, {
-        actor: 'agent', eventType: 'stage.change', target: project.id, result: 'error',
-        metadata: { from: job.currentStage, message },
-      });
-      this.deps.events({ type: 'error', projectId: project.id, message });
+      if (!report.dod.passed) {
+        assertTransition(job.currentStage, 'NEEDS_REPAIR');
+        updateJob(this.deps.db, jobId, { currentStage: 'NEEDS_REPAIR' });
+        updateProjectStatus(this.deps.db, project.id, 'NEEDS_REPAIR');
+        appendMessage(this.deps.db, jobId, { role: 'tool', tool_call_id: toolCallId, content: `quality_gate failed: ${report.dod.failures.join('; ')}` });
+        appendAudit(this.deps.db, {
+          actor: 'system', eventType: 'quality.fail', target: project.id, result: 'denied',
+          metadata: { failures: report.dod.failures },
+        });
+        this.deps.events({ type: 'error', projectId: project.id, message: `Quality gate gagal: ${report.dod.failures.join('; ')}` });
+        return;
+      }
     }
+
+    try {
+      assertTransition(job.currentStage, args.stage);
+    } catch (error) {
+      appendMessage(this.deps.db, jobId, { role: 'tool', tool_call_id: toolCallId, content: `POLICY: ${redact(error instanceof Error ? error.message : String(error))}` });
+      return;
+    }
+    updateJob(this.deps.db, jobId, { currentStage: args.stage });
+    updateProjectStatus(this.deps.db, project.id, args.stage);
+    appendMessage(this.deps.db, jobId, { role: 'tool', tool_call_id: toolCallId, content: `stage=${args.stage}` });
+    appendAudit(this.deps.db, {
+      actor: 'agent', eventType: 'stage.change', target: project.id, result: 'ok',
+      metadata: { from: job.currentStage, to: args.stage, summary: args.summary ?? '' },
+    });
+    this.deps.events({ type: 'stage', projectId: project.id, jobId, stage: args.stage, summary: args.summary ?? '' });
   }
 
   private fail(jobId: string, stage: ProjectStatus, message: string): void {

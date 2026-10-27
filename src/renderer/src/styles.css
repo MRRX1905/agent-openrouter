@@ -26,3 +26,5 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .budget { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
 .row button { margin-right: 8px; }
 .approval pre { padding: 8px; background: #05080b; border: 1px solid #2a323c; white-space: pre-wrap; }
+details { margin: 8px 0; }
+details pre { max-height: 240px; overflow: auto; padding: 8px; background: #05080b; }

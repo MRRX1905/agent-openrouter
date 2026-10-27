@@ -4,10 +4,12 @@ import { api } from '../lib/api';
 import StatusBadge from '../components/StatusBadge';
 import TerminalPanel from '../components/TerminalPanel';
 import ApprovalModal from '../components/ApprovalModal';
+import ReviewPanel from '../components/ReviewPanel';
 
 export default function ProjectPage({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null);
   const [job, setJob] = useState<Job | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [error, setError] = useState('');
 
   const reload = async () => {
@@ -17,7 +19,10 @@ export default function ProjectPage({ projectId }: { projectId: string }) {
 
   useEffect(() => { void reload().catch((cause) => setError(String(cause))); }, [projectId]);
   useEffect(() => api.onAgentEvent((event) => {
-    if (event.type === 'stage' && event.projectId === projectId) void reload();
+    if (event.type === 'stage' && event.projectId === projectId) {
+      setRefreshKey((value) => value + 1);
+      void reload();
+    }
     if (event.type === 'error' && event.projectId === projectId) setError(event.message);
   }), [projectId]);
 
@@ -45,6 +50,9 @@ export default function ProjectPage({ projectId }: { projectId: string }) {
         <button disabled={project.status !== 'PAUSED'} onClick={() => void resume()}>Resume</button>
       </div>
       <ApprovalModal projectId={project.id} />
+      {(project.status === 'REVIEW_REQUIRED' || project.status === 'NEEDS_REPAIR') && (
+        <ReviewPanel projectId={project.id} refreshKey={refreshKey} />
+      )}
       <TerminalPanel projectId={project.id} />
     </section>
   );

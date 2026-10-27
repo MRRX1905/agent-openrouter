@@ -9,6 +9,7 @@ import { classifyCommand } from './policy/policy-engine';
 import { BudgetService } from './providers/budget';
 import { OpenRouterClient } from './providers/openrouter';
 import { ProjectsService } from './projects-service';
+import { QualityService } from './quality/quality-service';
 import { SecretBox } from './security/secrets';
 import { SettingsService } from './settings-service';
 import { ToolRouter } from './tools/tool-router';
@@ -73,6 +74,7 @@ app.whenReady().then(() => {
     git,
   });
   const gateway = new OpenRouterClient({ apiKey: () => settings.getOpenRouterKey() });
+  const quality = new QualityService(workspaces, terminal);
   const orchestrator = new Orchestrator({
     db,
     projects,
@@ -81,6 +83,7 @@ app.whenReady().then(() => {
     budget,
     events: emitAgentEvent,
     model: () => settings.get().model,
+    quality,
   });
   registerIpc({ settings, budget, db, terminal, projects, approvals, orchestrator });
   createWindow();
