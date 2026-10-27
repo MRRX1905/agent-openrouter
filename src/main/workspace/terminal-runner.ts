@@ -19,6 +19,8 @@ export interface TerminalInput {
   timeoutMs?: number;
 }
 
+export interface TerminalResult { exitCode: number | null; stdout: string; stderr: string }
+
 const sanitizedEnv = (): NodeJS.ProcessEnv => {
   const env = { ...process.env };
   for (const key of Object.keys(env)) {
@@ -29,8 +31,31 @@ const sanitizedEnv = (): NodeJS.ProcessEnv => {
 
 export class TerminalRunner {
   private readonly children = new Map<string, ChildProcess>();
+  private readonly listeners = new Map<string, (event: TerminalEvent) => void>();
 
   constructor(private readonly onEvent: (event: TerminalEvent) => void) {}
+
+  private emit(event: TerminalEvent): void {
+    this.onEvent(event);
+    this.listeners.get(event.runId)?.(event);
+  }
+
+  run(input: Omit<TerminalInput, 'runId'>): Promise<TerminalResult> {
+    return new Promise((resolve) => {
+      const runId = newId('run');
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      this.listeners.set(runId, (event) => {
+        if (event.stream === 'stdout') stdout.push(event.data);
+        else if (event.stream === 'stderr') stderr.push(event.data);
+        else {
+          this.listeners.delete(runId);
+          resolve({ exitCode: event.exitCode ?? null, stdout: stdout.join(''), stderr: stderr.join('') });
+        }
+      });
+      this.start({ ...input, runId });
+    });
+  }
 
   start(input: TerminalInput): void {
     if (!input.executable.trim()) throw new Error('VALIDATION: executable is required');
@@ -53,14 +78,14 @@ export class TerminalRunner {
       if (sent >= MAX_OUTPUT_CHARS) return;
       const chunk = data.slice(0, MAX_OUTPUT_CHARS - sent);
       sent += chunk.length;
-      if (chunk) this.onEvent({ runId, stream, data: chunk });
+      if (chunk) this.emit({ runId, stream, data: chunk });
     };
     const finish = (code: number | null): void => {
       if (exited) return;
       exited = true;
       clearTimeout(timer);
       this.children.delete(runId);
-      this.onEvent({ runId, stream: 'exit', data: '', exitCode: code });
+      this.emit({ runId, stream: 'exit', data: '', exitCode: code });
     };
 
     child.stdout?.on('data', (data: Buffer) => emit('stdout', data.toString('utf8')));

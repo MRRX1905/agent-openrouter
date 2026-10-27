@@ -39,3 +39,59 @@ export const FILE_TOOLS: ToolDefinition[] = [
     },
   },
 ];
+
+export const COMMAND_TOOLS: ToolDefinition[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'run_command',
+      description: 'Run one allowlisted executable inside the project workspace. Never pass a shell string.',
+      parameters: {
+        type: 'object',
+        properties: {
+          executable: { type: 'string' },
+          args: { type: 'array', items: { type: 'string' } },
+          reason: { type: 'string' },
+        },
+        required: ['executable', 'args', 'reason'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'git_status',
+      description: 'Show git status for the project workspace.',
+      parameters: { type: 'object', properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'git_diff',
+      description: 'Show a git diff summary for the project workspace.',
+      parameters: { type: 'object', properties: {}, additionalProperties: false },
+    },
+  },
+];
+
+export const STAGE_TOOL: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'update_stage',
+    description: 'Move the project to a valid next workflow stage.',
+    parameters: {
+      type: 'object',
+      properties: {
+        stage: {
+          type: 'string',
+          enum: ['PLANNING', 'READY', 'BUILDING', 'TESTING', 'REPAIRING', 'DOCUMENTING', 'REVIEW_REQUIRED', 'NEEDS_REPAIR', 'BLOCKED', 'FAILED'],
+        },
+        summary: { type: 'string' },
+      },
+      required: ['stage', 'summary'],
+      additionalProperties: false,
+    },
+  },
+};

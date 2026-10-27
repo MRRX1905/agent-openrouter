@@ -127,6 +127,11 @@ export function getJob(db: DatabaseSync, id: string): Job {
   return toJob(row);
 }
 
+export function getLatestJob(db: DatabaseSync, projectId: string): Job | null {
+  const row = db.prepare('SELECT * FROM jobs WHERE project_id = ? ORDER BY started_at DESC LIMIT 1').get(projectId) as Row | undefined;
+  return row ? toJob(row) : null;
+}
+
 export function updateJob(
   db: DatabaseSync,
   id: string,
@@ -173,6 +178,18 @@ export function recordApiRequest(
     input.id, input.projectId, input.provider, input.model, input.status, input.httpStatus,
     input.timestamp, input.tokenUsage ? JSON.stringify(input.tokenUsage) : null, input.cost, input.errorCode,
   );
+}
+
+export function recordToolRun(
+  db: DatabaseSync,
+  input: {
+    id: string; projectId: string; tool: string; command: string;
+    exitCode: number | null; startedAt: string; endedAt: string | null; outputLogPath: string | null;
+  },
+): void {
+  db.prepare(
+    'INSERT INTO tool_runs (id, project_id, tool, command, exit_code, started_at, ended_at, output_log_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(input.id, input.projectId, input.tool, input.command, input.exitCode, input.startedAt, input.endedAt, input.outputLogPath);
 }
 
 export function countRequestsToday(db: DatabaseSync, now = nowIso()): number {
