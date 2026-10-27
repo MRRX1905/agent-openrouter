@@ -3,6 +3,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { newId, nowIso } from '../shared/ids';
 import type { AppSettings, OperatingMode, ProjectBrief } from '../shared/types';
 import type { Orchestrator } from './agent/orchestrator';
+import { createBackup } from './backup';
 import { getLatestJob, getProject } from './db/repositories';
 import type { GitHubAuth } from './github/auth';
 import type { GitHubPublisher } from './github/publish';
@@ -171,5 +172,16 @@ export function registerIpc(deps: IpcDeps): void {
     const result = await deps.publisher.publish({ workspace: project.workspacePath, repoName, visibility, projectId });
     deps.db.prepare('UPDATE projects SET github_url = ?, updated_at = ? WHERE id = ?').run(result.repoUrl, nowIso(), projectId);
     return result;
+  });
+  ipcMain.handle('backup:create', async () => {
+    const dir = app.getPath('userData');
+    return { path: await createBackup(deps.db, dir) };
+  });
+  ipcMain.handle('stats:get', () => {
+    const projects = Number((deps.db.prepare('SELECT COUNT(*) AS count FROM projects').get() as { count: number }).count);
+    const requestsTotal = Number((deps.db.prepare('SELECT COUNT(*) AS count FROM api_requests').get() as { count: number }).count);
+    const day = new Date().toISOString().slice(0, 10);
+    const requestsToday = Number((deps.db.prepare('SELECT COUNT(*) AS count FROM api_requests WHERE substr(timestamp, 1, 10) = ?').get(day) as { count: number }).count);
+    return { projects, requestsTotal, requestsToday };
   });
 }

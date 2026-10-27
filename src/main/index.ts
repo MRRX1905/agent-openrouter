@@ -23,6 +23,10 @@ import { WorkspaceService } from './workspace/workspace-service';
 
 const isDev = Boolean(process.env.ELECTRON_RENDERER_URL);
 
+if (process.env.R3X_E2E === '1') {
+  app.setPath('userData', join(app.getPath('temp'), `r3x-e2e-${process.pid}`));
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,

@@ -1,0 +1,17 @@
+appId: com.r3x.agentstudio
+productName: R3X Agent Studio
+directories:
+  output: release
+files:
+  - out/**/*
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true

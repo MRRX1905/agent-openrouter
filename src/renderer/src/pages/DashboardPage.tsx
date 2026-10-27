@@ -6,7 +6,11 @@ import StatusBadge from '../components/StatusBadge';
 
 export default function DashboardPage({ onOpen, onNew }: { onOpen: (id: string) => void; onNew: () => void }) {
   const [projects, setProjects] = useState<Project[]>([]);
-  useEffect(() => { void api.invoke('projects:list').then(setProjects); }, []);
+  const [stats, setStats] = useState<{ projects: number; requestsToday: number; requestsTotal: number } | null>(null);
+  useEffect(() => {
+    void api.invoke('projects:list').then(setProjects);
+    void api.invoke('stats:get').then(setStats);
+  }, []);
 
   return (
     <section>
@@ -15,6 +19,11 @@ export default function DashboardPage({ onOpen, onNew }: { onOpen: (id: string) 
         <button onClick={onNew}>Proyek baru</button>
       </div>
       <BudgetBar />
+      {stats && (
+        <p>
+          Statistik: {stats.projects} proyek · {stats.requestsToday} request hari ini · {stats.requestsTotal} request total
+        </p>
+      )}
       {projects.length === 0 && <p>Belum ada proyek.</p>}
       <div className="grid">
         {projects.map((project) => (

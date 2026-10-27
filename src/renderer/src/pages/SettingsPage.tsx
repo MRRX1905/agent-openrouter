@@ -34,6 +34,11 @@ export default function SettingsPage() {
     setMessage('API key disimpan terenkripsi.');
   };
 
+  const backup = async () => {
+    const { path } = await api.invoke('backup:create');
+    setMessage(`Backup dibuat: ${path}`);
+  };
+
   return (
     <section>
       <h2>Pengaturan</h2>
@@ -58,6 +63,10 @@ export default function SettingsPage() {
       <input type="password" value={apiKey} placeholder="sk-or-v1-..." onChange={(e) => setApiKey(e.target.value)} />
       <button disabled={!apiKey} onClick={() => void saveKey()}>Simpan key</button>
       <button onClick={() => void api.invoke('secret:clearOpenRouterKey').then(() => api.invoke('settings:get')).then(setSettings)}>Hapus key</button>
+
+      <h3>Backup</h3>
+      <button onClick={() => void backup()}>Backup database</button>
+
       {message && <p role="status">{message}</p>}
     </section>
   );
