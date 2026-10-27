@@ -1,0 +1,10 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #101317;
+  color: #e7edf3;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.app { padding: 24px; }
+button, input, textarea, select { font: inherit; }
