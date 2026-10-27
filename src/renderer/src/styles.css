@@ -8,3 +8,19 @@
 body { margin: 0; }
 .app { padding: 24px; }
 button, input, textarea, select { font: inherit; }
+.shell { display: grid; grid-template-columns: 200px 1fr; min-height: 100vh; }
+.sidebar { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: #171c22; }
+.sidebar button { text-align: left; }
+.content { padding: 24px; overflow: auto; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.card { padding: 16px; border: 1px solid #2a323c; border-radius: 8px; background: #151a20; }
+label { display: block; margin: 8px 0; }
+input, textarea, select { width: 100%; padding: 8px; background: #0d1116; color: inherit; border: 1px solid #2a323c; border-radius: 6px; }
+textarea { min-height: 72px; }
+button { padding: 8px 12px; background: #234; color: inherit; border: 1px solid #345; border-radius: 6px; cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #26313d; font-size: 12px; }
+.terminal pre { min-height: 180px; max-height: 360px; overflow: auto; padding: 12px; background: #05080b; border: 1px solid #2a323c; white-space: pre-wrap; }
+.terminal-controls { display: flex; gap: 8px; margin: 12px 0; }
+.budget { display: flex; align-items: center; gap: 12px; margin: 12px 0; }

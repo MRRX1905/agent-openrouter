@@ -145,3 +145,24 @@ export function listPublicSettings(db: DatabaseSync): Record<string, string> {
   const rows = db.prepare('SELECT key, value FROM settings WHERE is_secret = 0').all() as Array<{ key: string; value: string }>;
   return Object.fromEntries(rows.map((row) => [row.key, row.value]));
 }
+
+export function appendAudit(
+  db: DatabaseSync,
+  input: {
+    actor: 'user' | 'agent' | 'system';
+    eventType: string;
+    target: string;
+    result: 'ok' | 'denied' | 'error';
+    metadata?: Record<string, unknown>;
+  },
+): void {
+  db.prepare(
+    'INSERT INTO audit_events (id, actor, event_type, target, result, timestamp, metadata_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(newId('aud'), input.actor, input.eventType, input.target, input.result, nowIso(), JSON.stringify(input.metadata ?? {}));
+}
+
+export function listAudit(db: DatabaseSync, target?: string): Array<Record<string, unknown>> {
+  return (target
+    ? db.prepare('SELECT * FROM audit_events WHERE target = ? ORDER BY timestamp DESC').all(target)
+    : db.prepare('SELECT * FROM audit_events ORDER BY timestamp DESC').all()) as Array<Record<string, unknown>>;
+}

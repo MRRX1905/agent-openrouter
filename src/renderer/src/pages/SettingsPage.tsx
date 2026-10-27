@@ -42,6 +42,7 @@ export default function SettingsPage() {
       <label>Batas request/hari <input type="number" min={1} max={1000} value={settings.dailyRequestCap} onChange={(e) => setSettings({ ...settings, dailyRequestCap: Number(e.target.value) })} /></label>
       <label>Reserve repair (%) <input type="number" min={0} max={80} value={settings.repairReservePct} onChange={(e) => setSettings({ ...settings, repairReservePct: Number(e.target.value) })} /></label>
       <label>Folder workspace <input value={settings.workspaceRoot} onChange={(e) => setSettings({ ...settings, workspaceRoot: e.target.value })} /></label>
+      <small>Perubahan folder workspace berlaku setelah aplikasi di-restart.</small>
       <label>Mode
         <select value={settings.mode} onChange={(e) => setSettings({ ...settings, mode: e.target.value as AppSettings['mode'] })}>
           <option value="auto">Auto Build</option>

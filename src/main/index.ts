@@ -4,9 +4,11 @@ import { openDatabase } from './db/database';
 import { emitAgentEvent } from './events';
 import { registerIpc } from './ipc';
 import { BudgetService } from './providers/budget';
+import { ProjectsService } from './projects-service';
 import { SecretBox } from './security/secrets';
 import { SettingsService } from './settings-service';
 import { TerminalRunner } from './workspace/terminal-runner';
+import { WorkspaceService } from './workspace/workspace-service';
 
 const isDev = Boolean(process.env.ELECTRON_RENDERER_URL);
 
@@ -52,8 +54,10 @@ app.whenReady().then(() => {
     get dailyRequestCap() { return settings.get().dailyRequestCap; },
     get repairReservePct() { return settings.get().repairReservePct; },
   });
+  const workspaces = new WorkspaceService(settings.get().workspaceRoot);
+  const projects = new ProjectsService(db, workspaces);
   const terminal = new TerminalRunner((event) => emitAgentEvent({ type: 'terminal', ...event }));
-  registerIpc({ settings, budget, db, terminal });
+  registerIpc({ settings, budget, db, terminal, projects });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -1,9 +1,10 @@
 import { app, ipcMain } from 'electron';
 import type { DatabaseSync } from 'node:sqlite';
 import { newId } from '../shared/ids';
-import type { AppSettings } from '../shared/types';
+import type { AppSettings, OperatingMode, ProjectBrief } from '../shared/types';
 import { getProject } from './db/repositories';
 import type { BudgetService } from './providers/budget';
+import type { ProjectsService } from './projects-service';
 import type { SettingsService } from './settings-service';
 import type { TerminalRunner } from './workspace/terminal-runner';
 
@@ -12,6 +13,7 @@ export interface IpcDeps {
   budget: BudgetService;
   db: DatabaseSync;
   terminal: TerminalRunner;
+  projects: ProjectsService;
 }
 
 const asObject = (value: unknown): Record<string, unknown> => {
@@ -33,6 +35,19 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle('secret:clearOpenRouterKey', () => {
     deps.settings.clearOpenRouterKey();
     return { ok: true } as const;
+  });
+  ipcMain.handle('projects:list', () => deps.projects.list());
+  ipcMain.handle('projects:get', (_event, payload) => {
+    const { projectId } = asObject(payload);
+    if (typeof projectId !== 'string') throw new Error('VALIDATION: projectId is required');
+    return deps.projects.get(projectId);
+  });
+  ipcMain.handle('projects:create', (_event, payload) => {
+    const { name, brief, mode } = asObject(payload);
+    if (typeof name !== 'string' || typeof mode !== 'string' || typeof brief !== 'object' || brief === null) {
+      throw new Error('VALIDATION: invalid project payload');
+    }
+    return deps.projects.create({ name, brief: brief as ProjectBrief, mode: mode as OperatingMode });
   });
   ipcMain.handle('terminal:run', (_event, payload) => {
     const { projectId, executable, args } = asObject(payload);
