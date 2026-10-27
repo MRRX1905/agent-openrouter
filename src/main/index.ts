@@ -12,6 +12,7 @@ import { ProjectsService } from './projects-service';
 import { QualityService } from './quality/quality-service';
 import { SecretBox } from './security/secrets';
 import { SettingsService } from './settings-service';
+import { SkillService } from './skills/skill-service';
 import { ToolRouter } from './tools/tool-router';
 import { GitService } from './workspace/git-service';
 import { TerminalRunner } from './workspace/terminal-runner';
@@ -75,6 +76,7 @@ app.whenReady().then(() => {
   });
   const gateway = new OpenRouterClient({ apiKey: () => settings.getOpenRouterKey() });
   const quality = new QualityService(workspaces, terminal, approvals);
+  const skills = new SkillService(db, join(app.getPath('userData'), 'skills'));
   const orchestrator = new Orchestrator({
     db,
     projects,
@@ -85,7 +87,7 @@ app.whenReady().then(() => {
     model: () => settings.get().model,
     quality,
   });
-  registerIpc({ settings, budget, db, terminal, projects, approvals, orchestrator });
+  registerIpc({ settings, budget, db, terminal, projects, approvals, orchestrator, skills });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

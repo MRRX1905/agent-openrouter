@@ -21,7 +21,9 @@ export interface IpcContract {
   'approvals:list': { req: { projectId: string }; res: ApprovalRecord[] };
   'approvals:decide': { req: { approvalId: string; decision: 'approved' | 'rejected' }; res: { ok: true } };
   'skills:search': { req: { query: string }; res: SkillSearchResult[] };
+  'skills:list': { req: void; res: SkillRecord[] };
   'skills:install': { req: { source: string; skillId: string }; res: SkillRecord };
+  'skills:review': { req: { skillId: string; status: 'approved' | 'rejected' }; res: { ok: true } };
   'skills:setEnabled': { req: { skillId: string; enabled: boolean }; res: { ok: true } };
   'github:startDeviceFlow': { req: void; res: { userCode: string; verificationUri: string; expiresIn: number } };
   'github:pollDeviceFlow': { req: void; res: { status: 'pending' | 'connected' | 'expired'; login?: string } };

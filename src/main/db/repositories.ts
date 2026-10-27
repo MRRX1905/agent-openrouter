@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { newId, nowIso } from '../../shared/ids';
 import type {
   AgentMessage, ApprovalDecision, ApprovalRecord, Job, Project, ProjectBrief, ProjectStatus, RiskLevel,
+  SkillRecord, SkillReviewStatus,
 } from '../../shared/types';
 
 type Row = Record<string, unknown>;
@@ -213,6 +214,45 @@ export function getSetting(db: DatabaseSync, key: string): string | null {
 export function listPublicSettings(db: DatabaseSync): Record<string, string> {
   const rows = db.prepare('SELECT key, value FROM settings WHERE is_secret = 0').all() as Array<{ key: string; value: string }>;
   return Object.fromEntries(rows.map((row) => [row.key, row.value]));
+}
+
+const toSkill = (row: Row): SkillRecord => ({
+  id: String(row.id), name: String(row.name), source: String(row.source),
+  versionOrCommit: String(row.version_or_commit), checksum: String(row.checksum),
+  reviewStatus: String(row.review_status) as SkillReviewStatus,
+  enabled: Number(row.enabled) === 1,
+});
+
+export function upsertSkill(
+  db: DatabaseSync,
+  input: { id: string; name: string; source: string; versionOrCommit: string; checksum: string },
+): SkillRecord {
+  db.prepare(
+    `INSERT INTO skills (id, name, source, version_or_commit, checksum, review_status, enabled)
+     VALUES (?, ?, ?, ?, ?, 'pending', 0)
+     ON CONFLICT(id) DO UPDATE SET name = excluded.name, source = excluded.source,
+       version_or_commit = excluded.version_or_commit, checksum = excluded.checksum,
+       review_status = 'pending', enabled = 0`,
+  ).run(input.id, input.name, input.source, input.versionOrCommit, input.checksum);
+  return getSkill(db, input.id);
+}
+
+export function getSkill(db: DatabaseSync, id: string): SkillRecord {
+  const row = db.prepare('SELECT * FROM skills WHERE id = ?').get(id) as Row | undefined;
+  if (!row) throw new Error(`NOT_FOUND: skill ${id}`);
+  return toSkill(row);
+}
+
+export function listSkills(db: DatabaseSync): SkillRecord[] {
+  return (db.prepare('SELECT * FROM skills ORDER BY name').all() as Row[]).map(toSkill);
+}
+
+export function setSkillReview(db: DatabaseSync, id: string, status: SkillReviewStatus): void {
+  db.prepare('UPDATE skills SET review_status = ? WHERE id = ?').run(status, id);
+}
+
+export function setSkillEnabled(db: DatabaseSync, id: string, enabled: boolean): void {
+  db.prepare('UPDATE skills SET enabled = ? WHERE id = ?').run(enabled ? 1 : 0, id);
 }
 
 export function appendAudit(

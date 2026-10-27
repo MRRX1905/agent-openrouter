@@ -8,6 +8,8 @@ import type { ApprovalService } from './policy/approval-service';
 import type { BudgetService } from './providers/budget';
 import type { ProjectsService } from './projects-service';
 import type { SettingsService } from './settings-service';
+import { searchSkills } from './skills/registry';
+import type { SkillService } from './skills/skill-service';
 import type { TerminalRunner } from './workspace/terminal-runner';
 
 export interface IpcDeps {
@@ -18,6 +20,7 @@ export interface IpcDeps {
   projects: ProjectsService;
   approvals: ApprovalService;
   orchestrator: Orchestrator;
+  skills: SkillService;
 }
 
 const asObject = (value: unknown): Record<string, unknown> => {
@@ -53,10 +56,11 @@ export function registerIpc(deps: IpcDeps): void {
     }
     return deps.projects.create({ name, brief: brief as ProjectBrief, mode: mode as OperatingMode });
   });
-  ipcMain.handle('jobs:start', (_event, payload) => {
+  ipcMain.handle('jobs:start', async (_event, payload) => {
     const { projectId } = asObject(payload);
     if (typeof projectId !== 'string') throw new Error('VALIDATION: projectId is required');
-    return { jobId: deps.orchestrator.start(projectId) };
+    const instructions = await deps.skills.enabledInstructions();
+    return { jobId: deps.orchestrator.start(projectId, instructions) };
   });
   ipcMain.handle('jobs:pause', (_event, payload) => {
     const { jobId } = asObject(payload);
@@ -107,6 +111,32 @@ export function registerIpc(deps: IpcDeps): void {
       throw new Error('VALIDATION: invalid approval decision');
     }
     deps.approvals.decide(approvalId, decision);
+    return { ok: true } as const;
+  });
+  ipcMain.handle('skills:search', (_event, payload) => {
+    const { query } = asObject(payload);
+    if (typeof query !== 'string') throw new Error('VALIDATION: query is required');
+    return searchSkills(query);
+  });
+  ipcMain.handle('skills:list', () => deps.skills.list());
+  ipcMain.handle('skills:install', async (_event, payload) => {
+    const { source, skillId } = asObject(payload);
+    if (typeof source !== 'string' || typeof skillId !== 'string') throw new Error('VALIDATION: source and skillId are required');
+    const resolved = await deps.skills.resolve(source, skillId);
+    return deps.skills.install(resolved);
+  });
+  ipcMain.handle('skills:review', (_event, payload) => {
+    const { skillId, status } = asObject(payload);
+    if (typeof skillId !== 'string' || (status !== 'approved' && status !== 'rejected')) {
+      throw new Error('VALIDATION: invalid skill review');
+    }
+    deps.skills.review(skillId, status);
+    return { ok: true } as const;
+  });
+  ipcMain.handle('skills:setEnabled', (_event, payload) => {
+    const { skillId, enabled } = asObject(payload);
+    if (typeof skillId !== 'string' || typeof enabled !== 'boolean') throw new Error('VALIDATION: invalid skill toggle');
+    deps.skills.setEnabled(skillId, enabled);
     return { ok: true } as const;
   });
 }
