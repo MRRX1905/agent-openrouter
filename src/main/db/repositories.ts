@@ -1,6 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { newId, nowIso } from '../../shared/ids';
-import type { AgentMessage, Job, Project, ProjectBrief, ProjectStatus } from '../../shared/types';
+import type {
+  AgentMessage, ApprovalDecision, ApprovalRecord, Job, Project, ProjectBrief, ProjectStatus, RiskLevel,
+} from '../../shared/types';
 
 type Row = Record<string, unknown>;
 
@@ -33,6 +35,56 @@ const toJob = (row: Row): Job => ({
   startedAt: String(row.started_at),
   endedAt: row.ended_at ? String(row.ended_at) : null,
 });
+
+const toApproval = (row: Row): ApprovalRecord => ({
+  id: String(row.id),
+  projectId: String(row.project_id),
+  actionType: String(row.action_type) as ApprovalRecord['actionType'],
+  commandSummary: String(row.command_summary),
+  workingDirectory: String(row.working_directory),
+  riskLevel: String(row.risk_level) as RiskLevel,
+  decision: String(row.decision) as ApprovalDecision,
+  tokenHash: String(row.token_hash),
+  payloadJson: String(row.payload_json),
+  expiresAt: String(row.expires_at),
+  decidedAt: row.decided_at ? String(row.decided_at) : null,
+  consumedAt: row.consumed_at ? String(row.consumed_at) : null,
+});
+
+export function createApproval(
+  db: DatabaseSync,
+  input: {
+    projectId: string; actionType: ApprovalRecord['actionType']; commandSummary: string;
+    workingDirectory: string; riskLevel: RiskLevel; tokenHash: string;
+    payloadJson: string; expiresAt: string;
+  },
+): ApprovalRecord {
+  const id = newId('apr');
+  db.prepare(
+    `INSERT INTO approvals (id, project_id, action_type, command_summary, working_directory, risk_level, decision, token_hash, payload_json, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+  ).run(id, input.projectId, input.actionType, input.commandSummary, input.workingDirectory, input.riskLevel, input.tokenHash, input.payloadJson, input.expiresAt);
+  return getApproval(db, id);
+}
+
+export function getApproval(db: DatabaseSync, id: string): ApprovalRecord {
+  const row = db.prepare('SELECT * FROM approvals WHERE id = ?').get(id) as Row | undefined;
+  if (!row) throw new Error(`NOT_FOUND: approval ${id}`);
+  return toApproval(row);
+}
+
+export function listApprovals(db: DatabaseSync, projectId: string): ApprovalRecord[] {
+  return (db.prepare('SELECT * FROM approvals WHERE project_id = ? ORDER BY expires_at DESC').all(projectId) as Row[]).map(toApproval);
+}
+
+export function setApprovalDecision(db: DatabaseSync, id: string, decision: ApprovalDecision): void {
+  db.prepare('UPDATE approvals SET decision = ?, decided_at = ? WHERE id = ? AND decision = ?')
+    .run(decision, nowIso(), id, 'pending');
+}
+
+export function markApprovalConsumed(db: DatabaseSync, id: string): void {
+  db.prepare('UPDATE approvals SET consumed_at = ? WHERE id = ?').run(nowIso(), id);
+}
 
 export function createProject(
   db: DatabaseSync,

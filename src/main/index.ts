@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { openDatabase } from './db/database';
 import { emitAgentEvent } from './events';
 import { registerIpc } from './ipc';
+import { ApprovalService } from './policy/approval-service';
 import { BudgetService } from './providers/budget';
 import { ProjectsService } from './projects-service';
 import { SecretBox } from './security/secrets';
@@ -57,7 +58,8 @@ app.whenReady().then(() => {
   const workspaces = new WorkspaceService(settings.get().workspaceRoot);
   const projects = new ProjectsService(db, workspaces);
   const terminal = new TerminalRunner((event) => emitAgentEvent({ type: 'terminal', ...event }));
-  registerIpc({ settings, budget, db, terminal, projects });
+  const approvals = new ApprovalService(db, emitAgentEvent);
+  registerIpc({ settings, budget, db, terminal, projects, approvals });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

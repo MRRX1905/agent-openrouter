@@ -3,6 +3,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { newId } from '../shared/ids';
 import type { AppSettings, OperatingMode, ProjectBrief } from '../shared/types';
 import { getProject } from './db/repositories';
+import type { ApprovalService } from './policy/approval-service';
 import type { BudgetService } from './providers/budget';
 import type { ProjectsService } from './projects-service';
 import type { SettingsService } from './settings-service';
@@ -14,6 +15,7 @@ export interface IpcDeps {
   db: DatabaseSync;
   terminal: TerminalRunner;
   projects: ProjectsService;
+  approvals: ApprovalService;
 }
 
 const asObject = (value: unknown): Record<string, unknown> => {
@@ -68,6 +70,19 @@ export function registerIpc(deps: IpcDeps): void {
     const { runId } = asObject(payload);
     if (typeof runId !== 'string') throw new Error('VALIDATION: runId is required');
     deps.terminal.stop(runId);
+    return { ok: true } as const;
+  });
+  ipcMain.handle('approvals:list', (_event, payload) => {
+    const { projectId } = asObject(payload);
+    if (typeof projectId !== 'string') throw new Error('VALIDATION: projectId is required');
+    return deps.approvals.list(projectId);
+  });
+  ipcMain.handle('approvals:decide', (_event, payload) => {
+    const { approvalId, decision } = asObject(payload);
+    if (typeof approvalId !== 'string' || (decision !== 'approved' && decision !== 'rejected')) {
+      throw new Error('VALIDATION: invalid approval decision');
+    }
+    deps.approvals.decide(approvalId, decision);
     return { ok: true } as const;
   });
 }

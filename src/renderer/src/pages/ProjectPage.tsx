@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Project } from '@shared/types';
 import { api } from '../lib/api';
+import ApprovalModal from '../components/ApprovalModal';
 import StatusBadge from '../components/StatusBadge';
 import TerminalPanel from '../components/TerminalPanel';
 
@@ -23,6 +24,7 @@ export default function ProjectPage({ projectId }: { projectId: string }) {
       </div>
       <p>{project.brief.problem}</p>
       <small>{project.workspacePath}</small>
+      <ApprovalModal projectId={project.id} />
       <TerminalPanel projectId={project.id} />
     </section>
   );
