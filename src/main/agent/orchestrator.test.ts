@@ -74,6 +74,23 @@ describe('Orchestrator', () => {
     expect(loadMessages(db, jobId).some((message) => message.role === 'tool' && message.content?.includes('POLICY: invalid transition'))).toBe(true);
   });
 
+  it('pauses immediately and resumes from checkpoint', async () => {
+    const project = projects.list()[0]!;
+    const jobId = orchestrator.start(project.id);
+    orchestrator.pause(jobId);
+    await orchestrator.waitForIdle(jobId);
+    expect(projects.get(project.id).status).toBe('PAUSED');
+
+    responses.push({
+      id: 'resume', model: 'm', provider: null, content: '',
+      toolCalls: [tool('update_stage', { stage: 'FAILED', summary: 'resume test terminal state' })],
+      usage: null, finishReason: 'tool_calls',
+    });
+    await orchestrator.resume(jobId);
+    await orchestrator.waitForIdle(jobId);
+    expect(projects.get(project.id).status).toBe('FAILED');
+  });
+
   it('pauses when the budget is exhausted', async () => {
     const project = projects.list()[0]!;
     const tight = new Orchestrator({

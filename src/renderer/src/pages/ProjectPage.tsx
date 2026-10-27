@@ -1,20 +1,35 @@
 import { useEffect, useState } from 'react';
-import type { Project } from '@shared/types';
+import type { Job, Project } from '@shared/types';
 import { api } from '../lib/api';
-import ApprovalModal from '../components/ApprovalModal';
 import StatusBadge from '../components/StatusBadge';
 import TerminalPanel from '../components/TerminalPanel';
+import ApprovalModal from '../components/ApprovalModal';
 
 export default function ProjectPage({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null);
+  const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    void api.invoke('projects:get', { projectId }).then(setProject).catch((cause) => setError(String(cause)));
-  }, [projectId]);
+  const reload = async () => {
+    setProject(await api.invoke('projects:get', { projectId }));
+    setJob(await api.invoke('jobs:get', { projectId }));
+  };
+
+  useEffect(() => { void reload().catch((cause) => setError(String(cause))); }, [projectId]);
+  useEffect(() => api.onAgentEvent((event) => {
+    if (event.type === 'stage' && event.projectId === projectId) void reload();
+    if (event.type === 'error' && event.projectId === projectId) setError(event.message);
+  }), [projectId]);
 
   if (error) return <p role="alert">{error}</p>;
   if (!project) return <p>Memuat proyek…</p>;
+
+  const start = async () => {
+    await api.invoke('jobs:start', { projectId });
+    await reload();
+  };
+  const pause = async () => { if (job) { await api.invoke('jobs:pause', { jobId: job.id }); await reload(); } };
+  const resume = async () => { if (job) { await api.invoke('jobs:resume', { jobId: job.id }); await reload(); } };
 
   return (
     <section>
@@ -24,6 +39,11 @@ export default function ProjectPage({ projectId }: { projectId: string }) {
       </div>
       <p>{project.brief.problem}</p>
       <small>{project.workspacePath}</small>
+      <div className="row">
+        <button disabled={project.status !== 'IDEA'} onClick={() => void start()}>Start</button>
+        <button disabled={!job || (project.status !== 'PLANNING' && project.status !== 'BUILDING' && project.status !== 'TESTING')} onClick={() => void pause()}>Pause</button>
+        <button disabled={project.status !== 'PAUSED'} onClick={() => void resume()}>Resume</button>
+      </div>
       <ApprovalModal projectId={project.id} />
       <TerminalPanel projectId={project.id} />
     </section>

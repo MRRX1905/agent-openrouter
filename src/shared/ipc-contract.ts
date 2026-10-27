@@ -1,5 +1,5 @@
 import type {
-  AgentEvent, AppSettings, ApprovalRecord, OperatingMode, Project, ProjectBrief,
+  AgentEvent, AppSettings, ApprovalRecord, Job, OperatingMode, Project, ProjectBrief,
   SkillRecord, SkillSearchResult,
 } from './types';
 
@@ -15,6 +15,7 @@ export interface IpcContract {
   'jobs:start': { req: { projectId: string }; res: { jobId: string } };
   'jobs:pause': { req: { jobId: string }; res: { ok: true } };
   'jobs:resume': { req: { jobId: string }; res: { ok: true } };
+  'jobs:get': { req: { projectId: string }; res: Job | null };
   'terminal:run': { req: { projectId: string; executable: string; args: string[] }; res: { runId: string } };
   'terminal:stop': { req: { runId: string }; res: { ok: true } };
   'approvals:list': { req: { projectId: string }; res: ApprovalRecord[] };

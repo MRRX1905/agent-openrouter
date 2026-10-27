@@ -1,13 +1,18 @@
 import { app, BrowserWindow, safeStorage, session } from 'electron';
 import { join } from 'node:path';
+import { Orchestrator } from './agent/orchestrator';
 import { openDatabase } from './db/database';
 import { emitAgentEvent } from './events';
 import { registerIpc } from './ipc';
 import { ApprovalService } from './policy/approval-service';
+import { classifyCommand } from './policy/policy-engine';
 import { BudgetService } from './providers/budget';
+import { OpenRouterClient } from './providers/openrouter';
 import { ProjectsService } from './projects-service';
 import { SecretBox } from './security/secrets';
 import { SettingsService } from './settings-service';
+import { ToolRouter } from './tools/tool-router';
+import { GitService } from './workspace/git-service';
 import { TerminalRunner } from './workspace/terminal-runner';
 import { WorkspaceService } from './workspace/workspace-service';
 
@@ -59,7 +64,25 @@ app.whenReady().then(() => {
   const projects = new ProjectsService(db, workspaces);
   const terminal = new TerminalRunner((event) => emitAgentEvent({ type: 'terminal', ...event }));
   const approvals = new ApprovalService(db, emitAgentEvent);
-  registerIpc({ settings, budget, db, terminal, projects, approvals });
+  const git = new GitService(terminal);
+  const toolRouter = new ToolRouter(workspaces, {
+    db,
+    policy: classifyCommand,
+    approvals,
+    terminal,
+    git,
+  });
+  const gateway = new OpenRouterClient({ apiKey: () => settings.getOpenRouterKey() });
+  const orchestrator = new Orchestrator({
+    db,
+    projects,
+    tools: toolRouter,
+    gateway,
+    budget,
+    events: emitAgentEvent,
+    model: () => settings.get().model,
+  });
+  registerIpc({ settings, budget, db, terminal, projects, approvals, orchestrator });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

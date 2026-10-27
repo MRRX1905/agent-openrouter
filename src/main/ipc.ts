@@ -2,7 +2,8 @@ import { app, ipcMain } from 'electron';
 import type { DatabaseSync } from 'node:sqlite';
 import { newId } from '../shared/ids';
 import type { AppSettings, OperatingMode, ProjectBrief } from '../shared/types';
-import { getProject } from './db/repositories';
+import type { Orchestrator } from './agent/orchestrator';
+import { getLatestJob, getProject } from './db/repositories';
 import type { ApprovalService } from './policy/approval-service';
 import type { BudgetService } from './providers/budget';
 import type { ProjectsService } from './projects-service';
@@ -16,6 +17,7 @@ export interface IpcDeps {
   terminal: TerminalRunner;
   projects: ProjectsService;
   approvals: ApprovalService;
+  orchestrator: Orchestrator;
 }
 
 const asObject = (value: unknown): Record<string, unknown> => {
@@ -50,6 +52,28 @@ export function registerIpc(deps: IpcDeps): void {
       throw new Error('VALIDATION: invalid project payload');
     }
     return deps.projects.create({ name, brief: brief as ProjectBrief, mode: mode as OperatingMode });
+  });
+  ipcMain.handle('jobs:start', (_event, payload) => {
+    const { projectId } = asObject(payload);
+    if (typeof projectId !== 'string') throw new Error('VALIDATION: projectId is required');
+    return { jobId: deps.orchestrator.start(projectId) };
+  });
+  ipcMain.handle('jobs:pause', (_event, payload) => {
+    const { jobId } = asObject(payload);
+    if (typeof jobId !== 'string') throw new Error('VALIDATION: jobId is required');
+    deps.orchestrator.pause(jobId);
+    return { ok: true } as const;
+  });
+  ipcMain.handle('jobs:resume', async (_event, payload) => {
+    const { jobId } = asObject(payload);
+    if (typeof jobId !== 'string') throw new Error('VALIDATION: jobId is required');
+    await deps.orchestrator.resume(jobId);
+    return { ok: true } as const;
+  });
+  ipcMain.handle('jobs:get', (_event, payload) => {
+    const { projectId } = asObject(payload);
+    if (typeof projectId !== 'string') throw new Error('VALIDATION: projectId is required');
+    return getLatestJob(deps.db, projectId);
   });
   ipcMain.handle('terminal:run', (_event, payload) => {
     const { projectId, executable, args } = asObject(payload);

@@ -24,3 +24,5 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .terminal pre { min-height: 180px; max-height: 360px; overflow: auto; padding: 12px; background: #05080b; border: 1px solid #2a323c; white-space: pre-wrap; }
 .terminal-controls { display: flex; gap: 8px; margin: 12px 0; }
 .budget { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.row button { margin-right: 8px; }
+.approval pre { padding: 8px; background: #05080b; border: 1px solid #2a323c; white-space: pre-wrap; }
