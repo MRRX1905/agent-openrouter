@@ -1,8 +1,9 @@
 import { app, ipcMain } from 'electron';
 import type { AppSettings } from '../shared/types';
+import type { BudgetService } from './providers/budget';
 import type { SettingsService } from './settings-service';
 
-export interface IpcDeps { settings: SettingsService }
+export interface IpcDeps { settings: SettingsService; budget: BudgetService }
 
 const asObject = (value: unknown): Record<string, unknown> => {
   if (typeof value !== 'object' || value === null) throw new Error('VALIDATION: payload must be an object');
@@ -11,6 +12,7 @@ const asObject = (value: unknown): Record<string, unknown> => {
 
 export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle('app:ping', () => ({ version: app.getVersion() }));
+  ipcMain.handle('budget:get', () => deps.budget.snapshot());
   ipcMain.handle('settings:get', () => deps.settings.get());
   ipcMain.handle('settings:update', (_event, payload) => deps.settings.update(asObject(payload) as Partial<AppSettings>));
   ipcMain.handle('secret:setOpenRouterKey', (_event, payload) => {

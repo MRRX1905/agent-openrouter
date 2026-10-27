@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import BudgetBar from '../components/BudgetBar';
 import type { AppSettings } from '@shared/types';
 
 export default function SettingsPage() {
@@ -36,6 +37,7 @@ export default function SettingsPage() {
   return (
     <section>
       <h2>Pengaturan</h2>
+      <BudgetBar />
       <label>Model <input value={settings.model} onChange={(e) => setSettings({ ...settings, model: e.target.value })} /></label>
       <label>Batas request/hari <input type="number" min={1} max={1000} value={settings.dailyRequestCap} onChange={(e) => setSettings({ ...settings, dailyRequestCap: Number(e.target.value) })} /></label>
       <label>Reserve repair (%) <input type="number" min={0} max={80} value={settings.repairReservePct} onChange={(e) => setSettings({ ...settings, repairReservePct: Number(e.target.value) })} /></label>

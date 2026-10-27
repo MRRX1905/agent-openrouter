@@ -2,6 +2,7 @@ import { app, BrowserWindow, safeStorage, session } from 'electron';
 import { join } from 'node:path';
 import { openDatabase } from './db/database';
 import { registerIpc } from './ipc';
+import { BudgetService } from './providers/budget';
 import { SecretBox } from './security/secrets';
 import { SettingsService } from './settings-service';
 
@@ -45,7 +46,11 @@ app.whenReady().then(() => {
     decrypt: (value) => safeStorage.decryptString(value),
   });
   const settings = new SettingsService(db, secrets, join(app.getPath('documents'), 'R3X-Projects'));
-  registerIpc({ settings });
+  const budget = new BudgetService(db, {
+    get dailyRequestCap() { return settings.get().dailyRequestCap; },
+    get repairReservePct() { return settings.get().repairReservePct; },
+  });
+  registerIpc({ settings, budget });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
