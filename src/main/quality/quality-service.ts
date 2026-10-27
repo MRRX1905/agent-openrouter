@@ -1,10 +1,13 @@
 import type { Project } from '../../shared/types';
+import type { ApprovalService } from '../policy/approval-service';
 import type { WorkspaceService } from '../workspace/workspace-service';
 import type { TerminalRunner } from '../workspace/terminal-runner';
 import { scanWorkspace, type SecretFinding } from '../security/secret-scan';
-import { detectChecks, runChecks, type CheckResult } from './checks';
+import { detectChecks, runChecks, type CheckCommand, type CheckResult } from './checks';
 import { evaluateDod, type DodResult } from './dod';
 import { generateReadme, validateReadme } from './readme';
+
+type QualityApprover = Pick<ApprovalService, 'request' | 'wait' | 'consume'>;
 
 export interface QualityReport {
   checks: CheckResult[];
@@ -22,14 +25,13 @@ export class QualityService implements QualityGate {
   constructor(
     private readonly workspaces: WorkspaceService,
     private readonly terminal: TerminalRunner,
+    private readonly approvals?: QualityApprover,
   ) {}
 
   async run(project: Project): Promise<QualityReport> {
     const files = await this.workspaces.listFiles(project.workspacePath);
     const commands = await detectChecks(project.workspacePath);
-    const checks = await runChecks(project.workspacePath, {
-      run: (input) => this.terminal.run(input),
-    });
+    const checks = await this.executeChecks(project, commands);
     if (checks.length === 0) {
       const sourceFiles = files.filter((file) => !file.toLowerCase().endsWith('.md') && !file.split('/').at(-1)?.startsWith('.'));
       checks.push({
@@ -54,5 +56,31 @@ export class QualityService implements QualityGate {
       hasGitignore: files.includes('.gitignore'),
     });
     return { checks, secrets, readme, readmeIssues: validateReadme(readme), dod };
+  }
+
+  private async executeChecks(project: Project, commands: CheckCommand[]): Promise<CheckResult[]> {
+    const runner = { run: (input: { executable: string; args: string[]; cwd: string }) => this.terminal.run(input) };
+    if (commands.length === 0 || !this.approvals) return runChecks(project.workspacePath, runner, commands);
+
+    const approval = this.approvals.request({
+      projectId: project.id,
+      actionType: 'command',
+      commandSummary: commands.map((command) => [command.executable, ...command.args].join(' ')).join(' ; '),
+      workingDirectory: project.workspacePath,
+      riskLevel: 'medium',
+      payload: {
+        reason: 'local quality checks',
+        needsNetwork: false,
+        writesFiles: true,
+        checks: commands,
+      },
+    });
+    if (!(await this.approvals.wait(approval.id))) {
+      return commands.map((command) => ({
+        name: command.name, ok: false, exitCode: null, output: 'POLICY: quality checks rejected',
+      }));
+    }
+    this.approvals.consume(approval.id);
+    return runChecks(project.workspacePath, runner, commands);
   }
 }

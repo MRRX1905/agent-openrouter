@@ -36,10 +36,10 @@ export async function detectChecks(workspace: string): Promise<CheckCommand[]> {
   return commands;
 }
 
-export async function runChecks(workspace: string, runner: CheckRunner): Promise<CheckResult[]> {
-  const commands = await detectChecks(workspace);
+export async function runChecks(workspace: string, runner: CheckRunner, commands?: CheckCommand[]): Promise<CheckResult[]> {
+  const planned = commands ?? await detectChecks(workspace);
   const results: CheckResult[] = [];
-  for (const command of commands) {
+  for (const command of planned) {
     const result = await runner.run({ executable: command.executable, args: command.args, cwd: workspace });
     results.push({
       name: command.name,

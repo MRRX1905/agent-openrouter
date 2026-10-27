@@ -74,7 +74,7 @@ app.whenReady().then(() => {
     git,
   });
   const gateway = new OpenRouterClient({ apiKey: () => settings.getOpenRouterKey() });
-  const quality = new QualityService(workspaces, terminal);
+  const quality = new QualityService(workspaces, terminal, approvals);
   const orchestrator = new Orchestrator({
     db,
     projects,
