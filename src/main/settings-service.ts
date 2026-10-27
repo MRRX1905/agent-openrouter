@@ -7,6 +7,7 @@ const DEFAULT_MODEL = 'openrouter/auto';
 const DEFAULT_CAP = 50;
 const DEFAULT_RESERVE = 20;
 const MODES: OperatingMode[] = ['auto', 'supervised', 'repair'];
+const PATCH_KEYS = ['model', 'dailyRequestCap', 'repairReservePct', 'workspaceRoot', 'mode', 'githubClientId'] as const;
 
 export class SettingsService {
   constructor(
@@ -38,7 +39,8 @@ export class SettingsService {
     }
     if (patch.mode !== undefined && !MODES.includes(patch.mode)) throw new Error('VALIDATION: invalid mode');
     if (patch.workspaceRoot !== undefined && !patch.workspaceRoot.trim()) throw new Error('VALIDATION: workspaceRoot is required');
-    for (const [key, value] of Object.entries(patch)) {
+    for (const key of PATCH_KEYS) {
+      const value = patch[key];
       if (value !== undefined) setSetting(this.db, key, String(value));
     }
     return this.get();

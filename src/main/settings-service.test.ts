@@ -34,6 +34,24 @@ describe('SettingsService', () => {
     expect(secrets.get('secret:openrouter')).toBe('sk-or-v1-abcdefghijklmnopqrstuvwxyz');
   });
 
+  it('ignores keys outside the update allowlist', () => {
+    service.setOpenRouterKey('sk-or-v1-abcdefghijklmnopqrstuvwxyz');
+    service.update({ 'secret:openrouter': 'junk' } as never);
+    expect(secrets.get('secret:openrouter')).toBe('sk-or-v1-abcdefghijklmnopqrstuvwxyz');
+    expect(service.get().hasOpenRouterKey).toBe(true);
+  });
+
+  it('still updates allowed keys', () => {
+    const next = service.update({
+      model: 'openrouter/test', dailyRequestCap: 10, repairReservePct: 5,
+      workspaceRoot: 'C:/workspace', mode: 'auto', githubClientId: 'client-id',
+    });
+    expect(next).toMatchObject({
+      model: 'openrouter/test', dailyRequestCap: 10, repairReservePct: 5,
+      workspaceRoot: 'C:/workspace', mode: 'auto', githubClientId: 'client-id',
+    });
+  });
+
   it('validates caps and reserve', () => {
     expect(() => service.update({ dailyRequestCap: 0 })).toThrow('VALIDATION:');
     expect(() => service.update({ repairReservePct: 90 })).toThrow('VALIDATION:');
