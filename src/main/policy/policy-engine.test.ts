@@ -45,4 +45,13 @@ describe('classifyCommand', () => {
   it('normalizes .exe and uppercase', () => {
     expect(classify('GIT.EXE', ['status'])).toMatchObject({ action: 'allow' });
   });
+
+  it('blocks command.com as a shell', () => {
+    expect(classify('command.com', ['/c', 'whoami'])).toMatchObject({ action: 'block', risk: 'critical' });
+  });
+
+  it('blocks paths assigned to flags outside the workspace', () => {
+    expect(classify('node', ['--outDir=C:/Windows/tmp'])).toMatchObject({ action: 'block', risk: 'critical' });
+    expect(classify('node', ['--outDir=dist'])).toMatchObject({ action: 'approval', risk: 'medium' });
+  });
 });

@@ -17,7 +17,7 @@ export interface PolicyDecision {
   normalizedCommand: string;
 }
 
-const SHELLS = new Set(['cmd', 'powershell', 'pwsh', 'bash', 'sh', 'wscript', 'cscript', 'mshta']);
+const SHELLS = new Set(['cmd', 'command', 'powershell', 'pwsh', 'bash', 'sh', 'wscript', 'cscript', 'mshta']);
 const CRITICAL = new Set([
   'reg', 'sc', 'net', 'shutdown', 'format', 'diskpart', 'bcdedit', 'runas',
   'takeown', 'icacls', 'attrib', 'cipher', 'wmic', 'schtasks', 'taskkill',
@@ -36,15 +36,21 @@ const isInside = (root: string, target: string): boolean => {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 };
 
+const isUnsafePath = (candidate: string, workspace: string): boolean => {
+  if (/^https?:\/\//i.test(candidate)) return false;
+  if (path.isAbsolute(candidate)) return !isInside(workspace, candidate);
+  return candidate.split(/[\\/]/).includes('..');
+};
+
 const hasUnsafePathArg = (args: string[], workspace: string): boolean =>
-  args.some((arg) => {
-    if (/^https?:\/\//i.test(arg)) return false;
-    if (path.isAbsolute(arg)) return !isInside(workspace, arg);
-    return arg.split(/[\\/]/).includes('..');
-  });
+  args.some(
+    (arg) =>
+      isUnsafePath(arg, workspace) ||
+      arg.split('=').slice(1).some((segment) => isUnsafePath(segment, workspace)),
+  );
 
 const normalize = (executable: string): string =>
-  executable.trim().toLowerCase().replace(/\.exe$/, '');
+  executable.trim().toLowerCase().replace(/\.(exe|com)$/, '');
 
 const result = (
   action: PolicyAction,
