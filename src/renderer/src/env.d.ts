@@ -1,12 +1,8 @@
 /// <reference types="vite/client" />
+import type { R3xApi } from '../../shared/ipc-contract';
 
 declare global {
-  interface Window {
-    r3x: {
-      invoke(channel: string, payload?: unknown): Promise<unknown>;
-      onAgentEvent(callback: (event: unknown) => void): () => void;
-    };
-  }
+  interface Window { r3x: R3xApi }
 }
 
 export {};

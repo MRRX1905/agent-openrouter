@@ -1,5 +1,9 @@
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, safeStorage, session } from 'electron';
 import { join } from 'node:path';
+import { openDatabase } from './db/database';
+import { registerIpc } from './ipc';
+import { SecretBox } from './security/secrets';
+import { SettingsService } from './settings-service';
 
 const isDev = Boolean(process.env.ELECTRON_RENDERER_URL);
 
@@ -34,6 +38,14 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
+  const db = openDatabase(join(app.getPath('userData'), 'r3x.db'));
+  const secrets = new SecretBox(db, {
+    isAvailable: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (value) => safeStorage.encryptString(value),
+    decrypt: (value) => safeStorage.decryptString(value),
+  });
+  const settings = new SettingsService(db, secrets, join(app.getPath('documents'), 'R3X-Projects'));
+  registerIpc({ settings });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
