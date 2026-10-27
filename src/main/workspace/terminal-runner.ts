@@ -17,6 +17,7 @@ export interface TerminalInput {
   args: string[];
   cwd: string;
   timeoutMs?: number;
+  env?: Record<string, string>;
 }
 
 export interface TerminalResult { exitCode: number | null; stdout: string; stderr: string }
@@ -67,7 +68,7 @@ export class TerminalRunner {
       cwd: input.cwd,
       shell: false,
       windowsHide: true,
-      env: sanitizedEnv(),
+      env: { ...sanitizedEnv(), ...(input.env ?? {}) },
     });
     this.children.set(runId, child);
 

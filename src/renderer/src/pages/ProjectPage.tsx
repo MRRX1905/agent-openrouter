@@ -51,7 +51,7 @@ export default function ProjectPage({ projectId }: { projectId: string }) {
         <button disabled={project.status !== 'PAUSED'} onClick={() => void resume()}>Resume</button>
       </div>
       <ApprovalModal projectId={project.id} />
-      <GitHubPanel />
+      <GitHubPanel projectId={project.id} />
       {(project.status === 'REVIEW_REQUIRED' || project.status === 'NEEDS_REPAIR') && (
         <ReviewPanel projectId={project.id} refreshKey={refreshKey} />
       )}

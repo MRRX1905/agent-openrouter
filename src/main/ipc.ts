@@ -1,10 +1,11 @@
 import { app, ipcMain, shell } from 'electron';
 import type { DatabaseSync } from 'node:sqlite';
-import { newId } from '../shared/ids';
+import { newId, nowIso } from '../shared/ids';
 import type { AppSettings, OperatingMode, ProjectBrief } from '../shared/types';
 import type { Orchestrator } from './agent/orchestrator';
 import { getLatestJob, getProject } from './db/repositories';
 import type { GitHubAuth } from './github/auth';
+import type { GitHubPublisher } from './github/publish';
 import type { ApprovalService } from './policy/approval-service';
 import type { BudgetService } from './providers/budget';
 import type { ProjectsService } from './projects-service';
@@ -23,6 +24,7 @@ export interface IpcDeps {
   orchestrator: Orchestrator;
   skills: SkillService;
   github: GitHubAuth;
+  publisher: GitHubPublisher;
 }
 
 const asObject = (value: unknown): Record<string, unknown> => {
@@ -150,5 +152,24 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle('github:disconnect', () => {
     deps.github.disconnect();
     return { ok: true } as const;
+  });
+  ipcMain.handle('github:preflight', async (_event, payload) => {
+    const { projectId } = asObject(payload);
+    if (typeof projectId !== 'string') throw new Error('VALIDATION: projectId is required');
+    const project = getProject(deps.db, projectId);
+    return deps.publisher.preflight(project.workspacePath);
+  });
+  ipcMain.handle('github:publish', async (_event, payload) => {
+    const { projectId, repoName, visibility } = asObject(payload);
+    if (typeof projectId !== 'string' || typeof repoName !== 'string' || (visibility !== 'private' && visibility !== 'public')) {
+      throw new Error('VALIDATION: invalid publish payload');
+    }
+    const project = getProject(deps.db, projectId);
+    if (project.status !== 'REVIEW_REQUIRED') {
+      throw new Error('POLICY: project must be in REVIEW_REQUIRED before publishing');
+    }
+    const result = await deps.publisher.publish({ workspace: project.workspacePath, repoName, visibility, projectId });
+    deps.db.prepare('UPDATE projects SET github_url = ?, updated_at = ? WHERE id = ?').run(result.repoUrl, nowIso(), projectId);
+    return result;
   });
 }

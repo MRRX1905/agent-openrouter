@@ -28,6 +28,14 @@ export interface IpcContract {
   'github:startDeviceFlow': { req: void; res: { userCode: string; verificationUri: string; expiresIn: number } };
   'github:pollDeviceFlow': { req: void; res: { status: 'pending' | 'connected' | 'expired'; login?: string } };
   'github:disconnect': { req: void; res: { ok: true } };
+  'github:preflight': {
+    req: { projectId: string };
+    res: {
+      files: string[]; hasGitignore: boolean; gitAvailable: boolean; authenticated: boolean;
+      hasRemote: boolean; dirty: boolean;
+      secrets: Array<{ file: string; line: number; pattern: string; preview: string }>;
+    };
+  };
   'github:publish': { req: { projectId: string; repoName: string; visibility: 'private' | 'public' }; res: { repoUrl: string; commitSha: string } };
   'budget:get': { req: { projectId?: string }; res: { used: number; cap: number; reservePct: number } };
   'backup:create': { req: void; res: { path: string } };
