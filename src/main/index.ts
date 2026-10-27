@@ -1,10 +1,12 @@
 import { app, BrowserWindow, safeStorage, session } from 'electron';
 import { join } from 'node:path';
 import { openDatabase } from './db/database';
+import { emitAgentEvent } from './events';
 import { registerIpc } from './ipc';
 import { BudgetService } from './providers/budget';
 import { SecretBox } from './security/secrets';
 import { SettingsService } from './settings-service';
+import { TerminalRunner } from './workspace/terminal-runner';
 
 const isDev = Boolean(process.env.ELECTRON_RENDERER_URL);
 
@@ -50,7 +52,8 @@ app.whenReady().then(() => {
     get dailyRequestCap() { return settings.get().dailyRequestCap; },
     get repairReservePct() { return settings.get().repairReservePct; },
   });
-  registerIpc({ settings, budget });
+  const terminal = new TerminalRunner((event) => emitAgentEvent({ type: 'terminal', ...event }));
+  registerIpc({ settings, budget, db, terminal });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

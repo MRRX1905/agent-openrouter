@@ -1,9 +1,18 @@
 import { app, ipcMain } from 'electron';
+import type { DatabaseSync } from 'node:sqlite';
+import { newId } from '../shared/ids';
 import type { AppSettings } from '../shared/types';
+import { getProject } from './db/repositories';
 import type { BudgetService } from './providers/budget';
 import type { SettingsService } from './settings-service';
+import type { TerminalRunner } from './workspace/terminal-runner';
 
-export interface IpcDeps { settings: SettingsService; budget: BudgetService }
+export interface IpcDeps {
+  settings: SettingsService;
+  budget: BudgetService;
+  db: DatabaseSync;
+  terminal: TerminalRunner;
+}
 
 const asObject = (value: unknown): Record<string, unknown> => {
   if (typeof value !== 'object' || value === null) throw new Error('VALIDATION: payload must be an object');
@@ -23,6 +32,27 @@ export function registerIpc(deps: IpcDeps): void {
   });
   ipcMain.handle('secret:clearOpenRouterKey', () => {
     deps.settings.clearOpenRouterKey();
+    return { ok: true } as const;
+  });
+  ipcMain.handle('terminal:run', (_event, payload) => {
+    const { projectId, executable, args } = asObject(payload);
+    if (typeof projectId !== 'string' || typeof executable !== 'string' || !Array.isArray(args)) {
+      throw new Error('VALIDATION: invalid terminal payload');
+    }
+    const project = getProject(deps.db, projectId);
+    const runId = newId('run');
+    deps.terminal.start({
+      runId,
+      executable,
+      args: args.map(String),
+      cwd: project.workspacePath,
+    });
+    return { runId };
+  });
+  ipcMain.handle('terminal:stop', (_event, payload) => {
+    const { runId } = asObject(payload);
+    if (typeof runId !== 'string') throw new Error('VALIDATION: runId is required');
+    deps.terminal.stop(runId);
     return { ok: true } as const;
   });
 }
